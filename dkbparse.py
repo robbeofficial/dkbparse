@@ -7,10 +7,10 @@ from datetime import datetime
 from decimal import Decimal
 
 # TODO allow multiline comments for VISA statements
-# TODO statement and transaction always have same structure (regardless if account or visa)
+# TODO statementa always have same structure (regardless if account or visa)
 
 # patterns that are re-used in regular expressions
-DATE = r"\d\d\.\d\d\.(\d\d\b|\d\d\d\d\b)" 
+DATE = r"(\d\d)\.(\d\d)\.(\d\d\b|\d\d\d\d\b)" 
 DECIMAL = r"[\d.]+,\d*" # TODO more explicit (dot after every three digits)
 CURRENCY = r"[A-Z]{3}"
 TEXT = r"\S.*\S"
@@ -142,8 +142,8 @@ def read_bank_statement(pdf):
                 value = -value
             transactions.append({
                 'statement': f"{statement['no']}/{statement['year']}",
-                'booked': match.group('booked') + str(statement['year']), 
-                'valued': match.group('valued') + str(statement['year']),
+                'booked': date(match.group('booked') + str(statement['year'])), 
+                'valued': date(match.group('valued') + str(statement['year'])),
                 'type': match.group('type').strip(),
                 'value': value,
                 'comment': '',
@@ -192,14 +192,16 @@ def read_visa_statement_lines(lines):
             match = res['match']
             value = decimal(match.group('value')) * sign(match.group('sign'))
             if match.group('booked'):
-                booked = match.group('booked') 
+                booked = match.group('booked')
+                booked = date(booked[:6] + "20" + booked[6:])
             if match.group('valued'):
                 valued = match.group('valued')
+                valued = date(valued[:6] + "20" + valued[6:])
             transactions.append({
                 'statement': f"{statement['month']}/{statement['year']}",
                 'booked': booked, 
                 'valued': valued,
-                #'type': match_transaction.group('type').strip(),
+                'type': "VISA",
                 'value': value,
                 'comment': match.group('comment'),
             })
