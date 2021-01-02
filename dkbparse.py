@@ -13,15 +13,15 @@ DATE = r"\d\d\.\d\d\.(\d\d\b|\d\d\d\d\b)"
 DECIMAL = r"[\d.]+,\d*" # TODO more explicit (dot after every three digits)
 CURRENCY = r"[A-Z]{3}"
 TEXT = r"\S.*\S"
-SIGN = r"[+-]"
+SIGN = r"[+-SH]"
 
 re_visa_filename = re.compile(r"Kreditkartenabrechnung_\d\d\d\dxxxxxxxx\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
 re_filename = re.compile(r"Kontoauszug_\d{10}_Nr_\d\d\d\d_\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
 
 re_range = re.compile(rf"Kontoauszug Nummer (?P<no>\d*) / (?P<year>\d*) vom (?P<from>{DATE}) bis (?P<to>{DATE})")
 re_account = re.compile(r"Kontonummer (?P<account>[0-9]*) / IBAN (?P<iban>[A-Z0-9 ]*)")
-re_balance_old = re.compile(rf"ALTER KONTOSTAND\s*(?P<old>{DECIMAL})") # TODO Haben vs Soll
-re_balance_new = re.compile(rf"NEUER KONTOSTAND\s*(?P<new>{DECIMAL})") # TODO Haben vs Soll
+re_balance_old = re.compile(rf"ALTER KONTOSTAND\s*(?P<old>{DECIMAL}) (?P<sign>{SIGN}) EUR")
+re_balance_new = re.compile(rf"NEUER KONTOSTAND\s*(?P<new>{DECIMAL}) (?P<sign>{SIGN}) EUR")
 re_table_header = re.compile(r"(?P<booked>Bu.Tag)\s+(?P<valued>Wert)\s+(?P<comment>Wir haben für Sie gebucht)\s+(?P<minus>Belastung in EUR)\s+(?P<plus>Gutschrift in EUR)")
 re_transaction = re.compile(r"\s*(?P<booked>[0-9.]+)\s{3,}(?P<valued>[0-9.]+)\s{3,}(?P<type>.+)\s{3,}(?P<value>[0-9.]+,\d\d)\Z")
 re_transaction_details = re.compile(r"\s{3,}(?P<line>\S.+)")
@@ -99,7 +99,7 @@ def date(s):
     return datetime.strptime(s, '%d.%m.%Y')
 
 def sign(s):
-    return -1 if s == '-' else 1
+    return -1 if s in ['-','S'] else 1
 
 def read_bank_statement(pdf):
     """returns transactions list and statement summary extracted from a DKB bank statement"""
@@ -125,9 +125,11 @@ def read_bank_statement(pdf):
             statement['account'] = int(match.group('account'))
             statement['iban'] = match.group('iban')        
         elif check_match(re_balance_old, line, res):
-            statement['balance_old'] = decimal(res['match'].group('old'))        
+            match = res['match']
+            statement['balance_old'] = decimal(match.group('old')) * sign(match.group('sign'))        
         elif check_match(re_balance_new, line, res):
-            statement['balance_new'] = decimal(res['match'].group('new'))        
+            match = res['match']
+            statement['balance_new'] = decimal(match.group('new')) * sign(match.group('sign'))
         elif check_match(re_table_header, line, res):
             match_table_header = res['match']
         elif check_match(re_transaction, line, res):
