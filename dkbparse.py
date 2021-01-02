@@ -7,6 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 
 # TODO allow multiline comments for VISA statements
+# TODO statement and transaction always have same structure (regardless if account or visa)
 
 # patterns that are re-used in regular expressions
 DATE = r"\d\d\.\d\d\.(\d\d\b|\d\d\d\d\b)" 
@@ -31,6 +32,8 @@ re_visa_balance_new = re.compile(rf"\s*Neuer Saldo\s*(?P<value>{DECIMAL})\s*(?P<
 re_visa_balance_old = re.compile(rf"\s*(?P<valued>{DATE})\s+Saldo letzte Abrechnung\s+(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})")
 
 re_visa_subtotal = re.compile(rf"\s*(Zwischensumme|Übertrag von) Seite \d+\s+(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})")
+
+re_visa_range = re.compile(r"\s+Abrechnung:\s+(?P<month>\b\S*\b) (?P<year>\d\d\d\d)")
 
 re_visa_transaction_foreign = re.compile(
     rf"(?P<booked>{DATE})\s+"
@@ -175,6 +178,10 @@ def read_visa_statement_lines(lines):
             match = res['match']
             value = decimal(match.group('value')) * sign(match.group('sign'))
             statement['balance_old'] = value
+        elif check_match(re_visa_range, line, res):
+            match = res['match']
+            statement['month'] = match.group('month')
+            statement['year'] = match.group('year')
         elif check_match(re_visa_balance_new, line, res):
             match = res['match']
             value = decimal(match.group('value')) * sign(match.group('sign'))
@@ -189,7 +196,7 @@ def read_visa_statement_lines(lines):
             if match.group('valued'):
                 valued = match.group('valued')
             transactions.append({
-                #'statement': f"{statement['no']}/{statement['year']}",
+                'statement': f"{statement['month']}/{statement['year']}",
                 'booked': booked, 
                 'valued': valued,
                 #'type': match_transaction.group('type').strip(),
