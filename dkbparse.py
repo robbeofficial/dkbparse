@@ -11,10 +11,10 @@ from decimal import Decimal
 
 # patterns that are re-used in regular expressions
 DATE = r"(\d\d)\.(\d\d)\.(\d\d\b|\d\d\d\d\b)" 
-DECIMAL = r"[\d.]+,\d*" # TODO more explicit (dot after every three digits)
-CURRENCY = r"[A-Z]{3}"
+DECIMAL = r"\d{1,3}(?:\.\d{3})*(?:,\d+)?"
+CURRENCY = r"AED|AFN|ALL|AMD|ANG|AOA|ARS|AUD|AWG|AZN|BAM|BBD|BDT|BGN|BHD|BIF|BMD|BND|BOB|BRL|BSD|BTN|BWP|BYR|BZD|CAD|CDF|CHF|CLP|CNY|COP|CRC|CUC|CUP|CVE|CZK|DJF|DKK|DOP|DZD|EGP|ERN|ETB|EUR|FJD|FKP|GBP|GEL|GGP|GHS|GIP|GMD|GNF|GTQ|GYD|HKD|HNL|HRK|HTG|HUF|IDR|ILS|IMP|INR|IQD|IRR|ISK|JEP|JMD|JOD|JPY|KES|KGS|KHR|KMF|KPW|KRW|KWD|KYD|KZT|LAK|LBP|LKR|LRD|LSL|LYD|MAD|MDL|MGA|MKD|MMK|MNT|MOP|MRO|MUR|MVR|MWK|MXN|MYR|MZN|NAD|NGN|NIO|NOK|NPR|NZD|OMR|PAB|PEN|PGK|PHP|PKR|PLN|PYG|QAR|RON|RSD|RUB|RWF|SAR|SBD|SCR|SDG|SEK|SGD|SHP|SLL|SOS|SPL|SRD|STD|SVC|SYP|SZL|THB|TJS|TMT|TND|TOP|TRY|TTD|TVD|TWD|TZS|UAH|UGX|USD|UYU|UZS|VEF|VND|VUV|WST|XAF|XCD|XDR|XOF|XPF|YER|ZAR|ZMW|ZWD" # ISO 4217
 TEXT = r"\S.*\S"
-SIGN = r"[+-SH]"
+SIGN = r"[\+\-SH]"
 
 re_visa_filename = re.compile(r"Kreditkartenabrechnung_\d\d\d\dxxxxxxxx\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
 re_filename = re.compile(r"Kontoauszug_\d{10}_Nr_\d\d\d\d_\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
@@ -35,23 +35,24 @@ re_visa_subtotal = re.compile(rf"\s*(Zwischensumme|Übertrag von) Seite \d+\s+(?
 
 re_visa_range = re.compile(r"\s+Abrechnung:\s+(?P<month>\b\S*\b) (?P<year>\d\d\d\d)")
 
+# 15.03.19 15.03.19 KK UNPATTI, AMBON                           IDR               2.000.000               16.095,91         124,26 -
 re_visa_transaction_foreign = re.compile(
-    rf"(?P<booked>{DATE})\s+"
+    rf"^(?P<booked>{DATE})\s+"
     rf"(?P<valued>{DATE})\s+"
     rf"(?P<comment>{TEXT})\s+"
     rf"(?P<currency>{CURRENCY})\s+"
     rf"(?P<foreign>{DECIMAL})\s+"
     rf"(?P<rate>{DECIMAL})\s+"
     rf"(?P<value>{DECIMAL})\s*"
-    rf"(?P<sign>{SIGN})"
+    rf"(?P<sign>{SIGN})$"
 )
 
 re_visa_transaction = re.compile(
-    rf"(?P<booked>{DATE})?\s+"
+    rf"^(?P<booked>{DATE})?\s+"
     rf"(?P<valued>{DATE})?\s+"
-    rf"(?P<comment>{TEXT})\s+"    
+    rf"(?P<comment>{TEXT})\s+"
     rf"(?P<value>{DECIMAL})\s*"
-    rf"(?P<sign>{SIGN})"
+    rf"(?P<sign>{SIGN})$"
 )
 
 # re_visa_account = re.compile(r"\s*(?:DKB-VISA-Card:)\s*(?P<account>\S{4}\s\S{4}\s\S{4}\s\S{4})")
