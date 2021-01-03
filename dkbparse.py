@@ -60,6 +60,7 @@ re_visa_transaction = re.compile(
 def write_csv(fname, transactions):
     """writes transactions into a CSV file"""
     keys = transactions[0].keys()
+    transactions = sorted(transactions, key=lambda t: t['booked'], reverse=True)
     with open(fname, 'w', newline='')  as output_file:
         dict_writer = csv.DictWriter(output_file, keys)
         dict_writer.writeheader()
@@ -99,7 +100,7 @@ def decimal(s):
     return Decimal(s.replace('.','').replace(',','.'))
 
 def date(s):    
-    return datetime.strptime(s, '%d.%m.%Y')
+    return datetime.strptime(s, '%d.%m.%Y').date()
 
 def sign(s):
     return -1 if s in ['-','S'] else 1

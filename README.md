@@ -50,4 +50,4 @@ The script will output an error if the sum of all transactions of a statement do
 
 ## Performance
 
-The script scans around 100 PDF files (or 2000 transactions) per second.
+The script scans around 100 PDF files (or 2500 transactions) per second.
