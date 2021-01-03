@@ -52,7 +52,7 @@ re_visa_transaction = re.compile(
     rf"(?P<sign>{SIGN})$"
 )
 
-# re_visa_account = re.compile(r"\s*(?:DKB-VISA-Card:)\s*(?P<account>\S{4}\s\S{4}\s\S{4}\s\S{4})")
+re_visa_account = re.compile(r"^.*DKB-VISA-Card:\s*(?P<account>\b[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\b)$")
 # re_visa_owner = re.compile(r"\s*(?:Karteninhaber:)\s*(?P<owner>.*)")
 
 def write_csv(fname, transactions):
@@ -181,6 +181,9 @@ def read_visa_statement_lines(lines):
             match = res['match']
             statement['month'] = match.group('month')
             statement['year'] = match.group('year')
+        elif check_match(re_visa_account, line, res):
+            match = res['match']
+            statement['account'] = match['account']
         elif check_match(re_visa_balance_new, line, res):
             match = res['match']
             value = decimal(match.group('value')) * sign(match.group('sign'))
@@ -202,7 +205,7 @@ def read_visa_statement_lines(lines):
                 'valued': valued,
                 'type': "VISA",
                 'value': value,
-                'comment': match.group('comment'),
+                'comment': match.group('comment'),                
             })
         elif check_match(re_visa_comment_extended, line, res):
             match = res['match']
