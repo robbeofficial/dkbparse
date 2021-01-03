@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 from decimal import Decimal
 
-# TODO allow multiline comments for VISA statements
 # TODO statementa always have same structure (regardless if account or visa)
 
 # patterns that are re-used in regular expressions
@@ -30,12 +29,10 @@ re_transaction_details = re.compile(r"\s{3,}(?P<line>\S.+)")
 # re_visa_table_header = re.compile(r"(?P<booked>Datum)\s+(?P<valued>Datum Angabe des Unternehmens /)\s+(?P<curency>Währung)\s+(?P<foreign_value>Betrag)\s+(?P<rate>Kurs)\s+(?P<value>Betrag in)")
 re_visa_balance_new = re.compile(rf"\s*Neuer Saldo\s*(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})")
 re_visa_balance_old = re.compile(rf"\s*(?P<valued>{DATE})\s+Saldo letzte Abrechnung\s+(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})")
-
 re_visa_subtotal = re.compile(rf"\s*(Zwischensumme|Übertrag von) Seite \d+\s+(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})")
-
 re_visa_range = re.compile(r"\s+Abrechnung:\s+(?P<month>\b\S*\b) (?P<year>\d\d\d\d)")
+re_visa_comment_extended = re.compile(r"^\s{18}(?P<comment_extended>\S.*)$")
 
-# 15.03.19 15.03.19 KK UNPATTI, AMBON                           IDR               2.000.000               16.095,91         124,26 -
 re_visa_transaction_foreign = re.compile(
     rf"^(?P<booked>{DATE})\s+"
     rf"(?P<valued>{DATE})\s+"
@@ -207,6 +204,9 @@ def read_visa_statement_lines(lines):
                 'value': value,
                 'comment': match.group('comment'),
             })
+        elif check_match(re_visa_comment_extended, line, res):
+            match = res['match']
+            transactions[-1]['comment'] += (" " + match['comment_extended'])
         else:
             logging.debug(f"'{line}'\tNOT MATCHED")
 
