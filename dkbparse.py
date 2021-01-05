@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from decimal import Decimal
 
+# https://www.bonify.de/abkuerzungen-im-verwendungszweck
 # TODO statementa always have same structure (regardless if account or visa)
 
 # patterns that are re-used in regular expressions
@@ -140,6 +141,7 @@ def read_bank_statement(pdf):
             if match.start('value') < match_table_header.end('minus'):
                 value = -value
             transactions.append({
+                'account': statement['account'],
                 'statement': f"{statement['no']}/{statement['year']}",
                 'booked': date(match.group('booked') + str(statement['year'])), 
                 'valued': date(match.group('valued') + str(statement['year'])),
@@ -200,6 +202,7 @@ def read_visa_statement_lines(lines):
                 valued = match.group('valued')
                 valued = date(valued[:6] + "20" + valued[6:])
             transactions.append({
+                'account': statement['account'],
                 'statement': f"{statement['month']}/{statement['year']}",
                 'booked': booked, 
                 'valued': valued,
