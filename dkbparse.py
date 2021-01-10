@@ -98,7 +98,7 @@ def scan_dir(dirpath):
 
 def read_pdf_table(fname):
     """Reads contents of a PDF table into a string using pdftotext"""
-    return subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE).stdout.decode()
+    return subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode()
     err_lines = completed_process.stderr.decode().split('\n')
     for err_line in err_lines:
         logging.debug(f"pdftotext.stderr: {err_line}")
