@@ -15,6 +15,7 @@ DECIMAL = r"\d{1,3}(?:\.\d{3})*(?:,\d+)?"
 CURRENCY = r"AED|AFN|ALL|AMD|ANG|AOA|ARS|AUD|AWG|AZN|BAM|BBD|BDT|BGN|BHD|BIF|BMD|BND|BOB|BRL|BSD|BTN|BWP|BYR|BZD|CAD|CDF|CHF|CLP|CNY|COP|CRC|CUC|CUP|CVE|CZK|DJF|DKK|DOP|DZD|EGP|ERN|ETB|EUR|FJD|FKP|GBP|GEL|GGP|GHS|GIP|GMD|GNF|GTQ|GYD|HKD|HNL|HRK|HTG|HUF|IDR|ILS|IMP|INR|IQD|IRR|ISK|JEP|JMD|JOD|JPY|KES|KGS|KHR|KMF|KPW|KRW|KWD|KYD|KZT|LAK|LBP|LKR|LRD|LSL|LYD|MAD|MDL|MGA|MKD|MMK|MNT|MOP|MRO|MUR|MVR|MWK|MXN|MYR|MZN|NAD|NGN|NIO|NOK|NPR|NZD|OMR|PAB|PEN|PGK|PHP|PKR|PLN|PYG|QAR|RON|RSD|RUB|RWF|SAR|SBD|SCR|SDG|SEK|SGD|SHP|SLL|SOS|SPL|SRD|STD|SVC|SYP|SZL|THB|TJS|TMT|TND|TOP|TRY|TTD|TVD|TWD|TZS|UAH|UGX|USD|UYU|UZS|VEF|VND|VUV|WST|XAF|XCD|XDR|XOF|XPF|YER|ZAR|ZMW|ZWD" # ISO 4217
 TEXT = r"\S.*\S"
 SIGN = r"[\+\-SH]"
+CARD_NO = r"\b[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\b"
 
 re_visa_filename = re.compile(r"Kreditkartenabrechnung_\d\d\d\dxxxxxxxx\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
 re_filename = re.compile(r"Kontoauszug_\d{10}_Nr_\d\d\d\d_\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
@@ -53,7 +54,8 @@ re_visa_transaction = re.compile(
     rf"(?P<sign>{SIGN})$"
 )
 
-re_visa_account = re.compile(r"^.*DKB-VISA-Card:\s*(?P<account>\b[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\b)$")
+re_visa_account = re.compile(rf".*((?:DKB-VISA-Card\:)|(?:VISA\sCard-Nummer\:))\s*(?P<account>{CARD_NO})")
+# VISA Card-Nummer:
 # re_visa_owner = re.compile(r"\s*(?:Karteninhaber:)\s*(?P<owner>.*)")
 
 def write_csv(fname, transactions):
@@ -171,7 +173,7 @@ def read_visa_statement_lines(lines):
     """returns transactions list and statement summary extracted from a DKB VISA card statement text lines"""
     statement = {}
     transactions = []
-    statement['balance_old'] = 0
+    statement['balance_old'] = 0    
     res = {}
     
     for line in lines:
@@ -221,6 +223,7 @@ def read_visa_statement_lines(lines):
 
 def read_visa_statement(pdf):
     """returns transactions list and statement summary extracted from a DKB VISA card statement PDF file"""
+    logging.info(f"reading VISA statement {pdf} ...")
     table = read_pdf_table(pdf)
     lines = table.splitlines()
     
