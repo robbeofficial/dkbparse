@@ -51,3 +51,10 @@ The script will output an error if the sum of all transactions of a statement do
 ## Performance
 
 The script scans around 100 PDF files (or 2500 transactions) per second.
+
+## Limitations
+
+The main limitation of this approach is that the output depends on the version of the installed `pdftotext` ([Poppler](https://poppler.freedesktop.org/)). Different results on different platforms can not be excluded. For example, using pdftotext version 0.86.1, I occasionally get the following error, which appears to be a known issue.
+```
+Syntax Warning: FoFiType1::parse a line has more than 255 characters, we don't support this
+```
