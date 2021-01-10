@@ -86,8 +86,12 @@ def scan_dir(dirpath):
     return transactions, statements
 
 def read_pdf_table(fname):
-    """Reads contents of a PDF table into a string using pdftotext"""
-    return subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE).stdout.decode()
+    """Reads contents of a PDF table into a string using pdftotext"""	    """Reads contents of a PDF table into a string using pdftotext"""
+    return subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE).stdout.decode()	    completed_process = subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    err_lines = completed_process.stderr.decode().split('\n')
+    for err_line in err_lines:
+        logging.debug(f"pdftotext.stderr: {err_line}")
+    return completed_process.stdout.decode()
 
 def check_match(re, line, result):
     """calls re.match(line) but also writes the return value to result['match'] and writes match to log"""
