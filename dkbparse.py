@@ -11,11 +11,14 @@ from decimal import Decimal
 
 # patterns that are re-used in regular expressions
 DATE = r"(\d\d)\.(\d\d)\.(\d\d\b|\d\d\d\d\b)" 
+DATE_NO_YEAR = r"(\d\d)\.(\d\d)\." 
 DECIMAL = r"\d{1,3}(?:\.\d{3})*(?:,\d+)?"
+DECIMAL_FIXED_POINT = r"\d{1,3}(?:\.\d{3})*(?:,\d{2})"
 CURRENCY = r"AED|AFN|ALL|AMD|ANG|AOA|ARS|AUD|AWG|AZN|BAM|BBD|BDT|BGN|BHD|BIF|BMD|BND|BOB|BRL|BSD|BTN|BWP|BYR|BZD|CAD|CDF|CHF|CLP|CNY|COP|CRC|CUC|CUP|CVE|CZK|DJF|DKK|DOP|DZD|EGP|ERN|ETB|EUR|FJD|FKP|GBP|GEL|GGP|GHS|GIP|GMD|GNF|GTQ|GYD|HKD|HNL|HRK|HTG|HUF|IDR|ILS|IMP|INR|IQD|IRR|ISK|JEP|JMD|JOD|JPY|KES|KGS|KHR|KMF|KPW|KRW|KWD|KYD|KZT|LAK|LBP|LKR|LRD|LSL|LYD|MAD|MDL|MGA|MKD|MMK|MNT|MOP|MRO|MUR|MVR|MWK|MXN|MYR|MZN|NAD|NGN|NIO|NOK|NPR|NZD|OMR|PAB|PEN|PGK|PHP|PKR|PLN|PYG|QAR|RON|RSD|RUB|RWF|SAR|SBD|SCR|SDG|SEK|SGD|SHP|SLL|SOS|SPL|SRD|STD|SVC|SYP|SZL|THB|TJS|TMT|TND|TOP|TRY|TTD|TVD|TWD|TZS|UAH|UGX|USD|UYU|UZS|VEF|VND|VUV|WST|XAF|XCD|XDR|XOF|XPF|YER|ZAR|ZMW|ZWD" # ISO 4217
 TEXT = r"\S.*\S"
 SIGN = r"[\+\-SH]"
 CARD_NO = r"\b[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\b"
+BLANK = r"\s{3,}"
 
 re_visa_filename = re.compile(r"Kreditkartenabrechnung_\d\d\d\dxxxxxxxx\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
 re_filename = re.compile(r"Kontoauszug_\d{10}_Nr_\d\d\d\d_\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf")
@@ -25,8 +28,16 @@ re_account = re.compile(r"Kontonummer (?P<account>[0-9]*) / IBAN (?P<iban>[A-Z0-
 re_balance_old = re.compile(rf"ALTER KONTOSTAND\s*(?P<old>{DECIMAL}) (?P<sign>{SIGN}) EUR")
 re_balance_new = re.compile(rf"NEUER KONTOSTAND\s*(?P<new>{DECIMAL}) (?P<sign>{SIGN}) EUR")
 re_table_header = re.compile(r"(?P<booked>Bu.Tag)\s+(?P<valued>Wert)\s+(?P<comment>Wir haben für Sie gebucht)\s+(?P<minus>Belastung in EUR)\s+(?P<plus>Gutschrift in EUR)")
-re_transaction = re.compile(r"\s*(?P<booked>[0-9.]+)\s{3,}(?P<valued>[0-9.]+)\s{3,}(?P<type>.+)\s{3,}(?P<value>[0-9.]+,\d\d)\Z")
-re_transaction_details = re.compile(r"\s{3,}(?P<line>\S.+)")
+re_transaction = re.compile(
+    rf"^\s*(?P<booked>{DATE_NO_YEAR}){BLANK}"
+    rf"(?P<valued>{DATE_NO_YEAR}){BLANK}"
+    rf"(?P<type>{TEXT}){BLANK}"
+    rf"(?P<value>{DECIMAL_FIXED_POINT})$"
+)
+re_transaction_details = re.compile(
+    rf"((?:{BLANK})|(?:{DATE_NO_YEAR}\s+{DATE_NO_YEAR}\s+))"
+    rf"(?P<line>{TEXT})"
+)
 
 # re_visa_table_header = re.compile(r"(?P<booked>Datum)\s+(?P<valued>Datum Angabe des Unternehmens /)\s+(?P<curency>Währung)\s+(?P<foreign_value>Betrag)\s+(?P<rate>Kurs)\s+(?P<value>Betrag in)")
 re_visa_balance_new = re.compile(rf"\s*Neuer Saldo\s*(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})")
@@ -86,8 +97,8 @@ def scan_dir(dirpath):
     return transactions, statements
 
 def read_pdf_table(fname):
-    """Reads contents of a PDF table into a string using pdftotext"""	    """Reads contents of a PDF table into a string using pdftotext"""
-    return subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE).stdout.decode()	    completed_process = subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    """Reads contents of a PDF table into a string using pdftotext"""
+    return subprocess.run(["pdftotext", "-layout", fname, "-"], stdout=subprocess.PIPE).stdout.decode()
     err_lines = completed_process.stderr.decode().split('\n')
     for err_line in err_lines:
         logging.debug(f"pdftotext.stderr: {err_line}")
