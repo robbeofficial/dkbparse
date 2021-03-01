@@ -8,6 +8,8 @@ import os
 import sys
 from datetime import datetime
 from decimal import Decimal
+from os import getcwd
+from os.path import isfile
 
 # https://www.bonify.de/abkuerzungen-im-verwendungszweck
 # TODO statementa always have same structure (regardless if account or visa)
@@ -314,4 +316,9 @@ def read_visa_statement(pdf):
 
 if __name__ == '__main__':
     transactions, statements = scan_dirs(sys.argv[1:])
-    transactions_to_csv(sys.stdout, transactions)
+    tags_yaml = getcwd() + '/tags.yaml'
+    if isfile(tags_yaml):
+        from tagging import RegTag
+        regtag = RegTag(open(tags_yaml, 'r'))
+        transactions = map(lambda t: dict(t, **dict(tag=regtag.tag(t['comment']))) , transactions)
+    transactions_to_csv(sys.stdout, list(transactions))
