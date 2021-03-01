@@ -1,8 +1,11 @@
+#!/bin/python3
+
 import subprocess
 import re
 import logging
 import csv
 import os
+import sys
 from datetime import datetime
 from decimal import Decimal
 
@@ -60,7 +63,10 @@ re_visa_balance_old = re.compile(
 re_visa_subtotal = re.compile(
     rf"\s*(Zwischensumme|Übertrag von) Seite \d+\s+(?P<value>{DECIMAL})\s*(?P<sign>{SIGN})"
 )
-re_visa_range = re.compile(r"\s+Abrechnung:\s+(?P<month>\b\S*\b) (?P<year>\d\d\d\d)")
+re_visa_month_year = re.compile(r"\s+Abrechnung:\s+(?P<month>\b\S*\b) (?P<year>\d\d\d\d)")
+
+re_visa_range = re.compile(rf"Ihre Abrechnung vom (?P<from>{DATE}) bis (?P<to>{DATE})")
+
 re_visa_comment_extended = re.compile(r"^\s{18}(?P<comment_extended>\S.*)$")
 
 re_visa_transaction_foreign = re.compile(
@@ -89,46 +95,46 @@ re_visa_account = re.compile(
 # re_visa_owner = re.compile(r"\s*(?:Karteninhaber:)\s*(?P<owner>.*)")
 
 
-def write_csv(fname, transactions):
-    """writes transactions into a CSV file"""
+def transactions_to_csv(f, transactions):
+    """writes transactions as CSV to stdout"""
     keys = transactions[0].keys()
     transactions = sorted(transactions, key=lambda t: t["booked"], reverse=True)
-    with open(fname, "w", newline="") as output_file:
-        dict_writer = csv.DictWriter(output_file, keys)
-        dict_writer.writeheader()
-        dict_writer.writerows(transactions)
+    dict_writer = csv.DictWriter(f, keys)
+    dict_writer.writeheader()
+    dict_writer.writerows(transactions)
 
 
-def scan_dir(dirpath):
+def scan_dirs(dirpaths):
     """Recursively scans dirpath for DKB bank or visa statements and returns all parsed transactions and statements"""
     transactions = []
     statements = []
-    for dirpath, unused_dirnames, filenames in os.walk(dirpath):
-        logging.info(f"scanning {dirpath} ...")
-        for filename in filenames:
-            if re_visa_filename.match(filename):
-                transactions_statement, statement = read_visa_statement(
-                    f"{dirpath}/{filename}"
-                )
-                statements.append(statement)
-                transactions.extend(transactions_statement)
-            elif re_filename.match(filename):
-                transactions_statement, statement = read_bank_statement(
-                    f"{dirpath}/{filename}"
-                )
-                statements.append(statement)
-                transactions.extend(transactions_statement)
+    for dirpath in dirpaths:
+        for dirpath, unused_dirnames, filenames in os.walk(dirpath):
+            logging.info(f"scanning {dirpath} ...")
+            for filename in filenames:
+                if re_visa_filename.match(filename):
+                    transactions_statement, statement = read_visa_statement(
+                        f"{dirpath}/{filename}"
+                    )
+                    statements.append(statement)
+                    transactions.extend(transactions_statement)
+                elif re_filename.match(filename):
+                    transactions_statement, statement = read_bank_statement(
+                        f"{dirpath}/{filename}"
+                    )
+                    statements.append(statement)
+                    transactions.extend(transactions_statement)
 
     return transactions, statements
 
 
 def read_pdf_table(fname):
     """Reads contents of a PDF table into a string using pdftotext"""
-    return subprocess.run(
+    completed_process = subprocess.run(
         ["pdftotext", "-layout", fname, "-"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-    ).stdout.decode()
+    )
     err_lines = completed_process.stderr.decode().split("\n")
     for err_line in err_lines:
         logging.debug(f"pdftotext.stderr: {err_line}")
@@ -148,8 +154,8 @@ def decimal(s):
     return Decimal(s.replace(".", "").replace(",", "."))
 
 
-def date(s):
-    return datetime.strptime(s, "%d.%m.%Y").date()
+def date(s, format="%d.%m.%Y"):
+    return datetime.strptime(s, format).date()
 
 
 def sign(s):
@@ -240,13 +246,14 @@ def read_visa_statement_lines(lines):
             match = res["match"]
             value = decimal(match.group("value")) * sign(match.group("sign"))
             statement["balance_old"] = value
-        elif check_match(re_visa_range, line, res):
+        elif check_match(re_visa_month_year, line, res):
             match = res["match"]
             statement["month"] = match.group("month")
             statement["year"] = match.group("year")
-        elif check_match(re_visa_account, line, res):
+        elif check_match(re_visa_range, line, res):
             match = res["match"]
-            statement["account"] = match["account"]
+            statement["from"] = date(match.group("from"))
+            statement["to"] = date(match.group("to"))
         elif check_match(re_visa_balance_new, line, res):
             match = res["match"]
             value = decimal(match.group("value")) * sign(match.group("sign"))
@@ -280,6 +287,9 @@ def read_visa_statement_lines(lines):
             transactions[-1]["comment"] += " " + match["comment_extended"]
         else:
             logging.debug(f"'{line}'\tNOT MATCHED")
+        if check_match(re_visa_account, line, res):
+            match = res["match"]
+            statement["account"] = match["account"]
 
     return transactions, statement
 
@@ -301,3 +311,7 @@ def read_visa_statement(pdf):
         )
 
     return transactions, statement
+
+if __name__ == '__main__':
+    transactions, statements = scan_dirs(sys.argv[1:])
+    transactions_to_csv(sys.stdout, transactions)

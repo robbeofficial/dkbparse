@@ -5,7 +5,15 @@ PDF parser for DKB bank and VISA statements
 You will need to have Python 3 and pdftotext installed.
 
 ## Usage
-The easiest way of using this script is passing a direcotry that contains DKB PDF files (VISA and/or bank statements) to `dkbparse.scan_dir()`. The entire directory is scanned recursively. The function returns a list of transactions and a list of bank statements that were parsed:
+
+### Shell Script
+You can run `dkbparse.py` as shell script and pass a list of directories that contain DKB PDF statements. The script will write all parsed transactions as CSV to stdout:
+```bash
+$ ./dkbparse.py ~/dkb/account/1234567890/ ~/dkb/visa/4998xxxxxxxx1234/ > transactions.csv
+```
+
+### Library
+Alternatively, you can pass a list of direcotries that contains DKB PDF files (VISA and/or bank statements) to `dkbparse.scan_dir()`. All directories are scanned recursively. The function returns a list of transactions and a list of bank statements that were parsed:
 
 ```python
 import os
@@ -13,7 +21,7 @@ from dkbparse import scan_dir
 
 # folder with DKB PDFs
 dirpath = os.path.expanduser('~/dkb/visa/4998xxxxxxxx1234') 
-transactions, statements = dkbparse.scan_dir(dirpath)
+transactions, statements = dkbparse.scan_dirs([dirpath])
 ```
 
 A transaction dict looks like this
