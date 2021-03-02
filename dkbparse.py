@@ -99,8 +99,9 @@ re_visa_account = re.compile(
 
 def transactions_to_csv(f, transactions):
     """writes transactions as CSV to f"""
-    keys = ['account','statement','booked','valued','type','value','tag','comment']
-    transactions = sorted(transactions, key=lambda t: t["booked"], reverse=True)
+    keys = ['account','statement','booked','valued','type','value','tags','comment']
+    transactions = sorted(transactions, key=lambda t: t["booked"], reverse=True)    
+    transactions = map(lambda t: dict(t, **dict(tags = ' '.join(t['tags']))), transactions)
     dict_writer = csv.DictWriter(f, keys)
     dict_writer.writeheader()
     dict_writer.writerows(transactions)
@@ -109,7 +110,7 @@ def csv_to_transactions(f):
     """Reads transactions as CSV from f"""    
     Date = lambda s: datetime.strptime(s, '%Y-%m-%d').date()
     decimal_accuracy = Decimal('0.01')
-    converters={'valued': Date, 'booked': Date, 'value': lambda s: Decimal(s).quantize(decimal_accuracy), 'tag': lambda s: s if s else None}
+    converters={'valued': Date, 'booked': Date, 'value': lambda s: Decimal(s).quantize(decimal_accuracy), 'tags': lambda t: t.split(' ')}
     reader = csv.DictReader(f)
     transactions = []
     for row in reader:        
@@ -143,10 +144,10 @@ def scan_dirs(dirpaths):
 
 def apply_tags(transactions, fun):
     """Adds the reult of tagging function fun(comment) as new tag field"""
-    return list(map(lambda t: dict(t, **dict(tag=fun(t['comment']))) , transactions))
+    return list(map(lambda t: dict(t, **dict(tags=fun(t['comment']))) , transactions))
 
-def apply_annotations(transactions, annotations):
-    """Applies tags that are present in annotations also to transactions"""
+def apply_annotations(transactions, annotations, fun = lambda tags: tags):
+    """Applies tags that are present in annotations also to transactions after passing them to fun"""
     def transaction_hash(t):
             keys = ['account','statement','booked','valued','type','value','comment']
             return ''.join(map(lambda key: str(t[key]), keys)).replace(' ','')
@@ -166,7 +167,7 @@ def apply_annotations(transactions, annotations):
         if key not in index:                
             logging.error(f'Transaction not found "{key}"')
         else:
-            transactions[index[key]] = annotation
+            transactions[index[key]]['tags'] = fun(annotation['tags'])
 
     return transactions
 
@@ -252,6 +253,7 @@ def read_bank_statement(pdf):
                     "valued": date(match.group("valued") + str(statement["year"])),
                     "type": match.group("type").strip(),
                     "value": value,
+                    "tags": [],
                     "comment": "",
                 }
             )
@@ -321,6 +323,7 @@ def read_visa_statement_lines(lines):
                     "valued": valued,
                     "type": "VISA",
                     "value": value,
+                    "tags": [],
                     "comment": match.group("comment"),
                 }
             )
@@ -359,18 +362,20 @@ if __name__ == '__main__':
     
     # apply autotagging if tags-auto.yaml is present
     tags_auto = getcwd() + '/tags-auto.yaml'
+    tags_expand = lambda tags: tags
     if isfile(tags_auto):
         from tagging import RegTag
         regtag = RegTag(open(tags_auto, 'r'))
-        transactions = apply_tags(transactions, regtag.tag)
+        transactions = apply_tags(transactions, regtag.tags)
+        tags_expand = regtag.expand_parents
     
     # apply manual tagging if tags-manual.csv is present
     tags_manual = getcwd() + '/tags-manual.csv' 
     if isfile(tags_manual):
         annotations = csv_to_transactions(open(tags_manual))
-        transactions = apply_annotations(transactions, annotations)        
+        transactions = apply_annotations(transactions, annotations, tags_expand)
 
-    logging.error(transactions[0])
+    # logging.error(transactions[0])
     
     # write transactions as CSV to stdout
     transactions_to_csv(sys.stdout, transactions)

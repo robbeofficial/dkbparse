@@ -25,11 +25,17 @@ class RegTag:
     def exists(self, tag):
         return tag in self.parents.keys()
 
-    def tag(self, string):
-        matched = None
+    def tags(self, string):
+        matched = []
         for label, reg in self.regs.items():
             if reg.match(string.replace(' ','')):
                 if matched:
                     logging.error(f'Ambigious pattern {reg.pattern} matched {label} and {matched}')
-                matched = label
+                matched = self.parents[label] + [label]
         return matched
+
+    def expand_parents(self, tags):
+        if len(tags) == 1:
+            return self.parents[tags[0]] + tags
+        else:
+            return tags
