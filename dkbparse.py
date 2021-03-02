@@ -98,13 +98,25 @@ re_visa_account = re.compile(
 
 
 def transactions_to_csv(f, transactions):
-    """writes transactions as CSV to stdout"""
-    keys = transactions[0].keys()
+    """writes transactions as CSV to f"""
+    keys = ['account','statement','booked','valued','type','value','tag','comment']
     transactions = sorted(transactions, key=lambda t: t["booked"], reverse=True)
     dict_writer = csv.DictWriter(f, keys)
     dict_writer.writeheader()
     dict_writer.writerows(transactions)
 
+def csv_to_transactions(f):
+    """Reads transactions as CSV from f"""    
+    Date = lambda s: datetime.strptime(s, '%Y-%m-%d').date()
+    decimal_accuracy = Decimal('0.01')
+    converters={'valued': Date, 'booked': Date, 'value': lambda s: Decimal(s).quantize(decimal_accuracy), 'tag': lambda s: s if s else None}
+    reader = csv.DictReader(f)
+    transactions = []
+    for row in reader:        
+        for key, func in converters.items():
+            row[key] = func(row[key])
+        transactions.append(row)
+    return transactions
 
 def scan_dirs(dirpaths):
     """Recursively scans dirpath for DKB bank or visa statements and returns all parsed transactions and statements"""
@@ -129,6 +141,34 @@ def scan_dirs(dirpaths):
 
     return transactions, statements
 
+def apply_tags(transactions, fun):
+    """Adds the reult of tagging function fun(comment) as new tag field"""
+    return list(map(lambda t: dict(t, **dict(tag=fun(t['comment']))) , transactions))
+
+def apply_annotations(transactions, annotations):
+    """Applies tags that are present in annotations also to transactions"""
+    def transaction_hash(t):
+            keys = ['account','statement','booked','valued','type','value','comment']
+            return ''.join(map(lambda key: str(t[key]), keys)).replace(' ','')
+        
+    # build an index of transactions to avoid linear search for each annotation
+    index = {}
+    for i, t in enumerate(transactions):
+        key = transaction_hash(t)
+        if key in index:
+            logging.error(f'Hash collision for key {key}')
+            pass
+        index[key] = i
+    
+    # apply annotations to transactions
+    for annotation in annotations:            
+        key = transaction_hash(annotation)
+        if key not in index:                
+            logging.error(f'Transaction not found "{key}"')
+        else:
+            transactions[index[key]] = annotation
+
+    return transactions
 
 def read_pdf_table(fname):
     """Reads contents of a PDF table into a string using pdftotext"""
@@ -185,7 +225,7 @@ def read_bank_statement(pdf):
             statement["to"] = date(match.group("to"))
         elif check_match(re_account, line, res):
             match = res["match"]
-            statement["account"] = int(match.group("account"))
+            statement["account"] = match.group("account")
             statement["iban"] = match.group("iban")
         elif check_match(re_balance_old, line, res):
             match = res["match"]
@@ -316,9 +356,21 @@ def read_visa_statement(pdf):
 
 if __name__ == '__main__':
     transactions, statements = scan_dirs(sys.argv[1:])
-    tags_yaml = getcwd() + '/tags.yaml'
-    if isfile(tags_yaml):
+    
+    # apply autotagging if tags-auto.yaml is present
+    tags_auto = getcwd() + '/tags-auto.yaml'
+    if isfile(tags_auto):
         from tagging import RegTag
-        regtag = RegTag(open(tags_yaml, 'r'))
-        transactions = map(lambda t: dict(t, **dict(tag=regtag.tag(t['comment']))) , transactions)
-    transactions_to_csv(sys.stdout, list(transactions))
+        regtag = RegTag(open(tags_auto, 'r'))
+        transactions = apply_tags(transactions, regtag.tag)
+    
+    # apply manual tagging if tags-manual.csv is present
+    tags_manual = getcwd() + '/tags-manual.csv' 
+    if isfile(tags_manual):
+        annotations = csv_to_transactions(open(tags_manual))
+        transactions = apply_annotations(transactions, annotations)        
+
+    logging.error(transactions[0])
+    
+    # write transactions as CSV to stdout
+    transactions_to_csv(sys.stdout, transactions)
