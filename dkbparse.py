@@ -374,8 +374,6 @@ if __name__ == '__main__':
     if isfile(tags_manual):
         annotations = csv_to_transactions(open(tags_manual))
         transactions = apply_annotations(transactions, annotations, tags_expand)
-
-    # logging.error(transactions[0])
     
     # write transactions as CSV to stdout
     transactions_to_csv(sys.stdout, transactions)
