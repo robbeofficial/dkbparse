@@ -143,7 +143,7 @@ def scan_dirs(dirpaths):
     return transactions, statements
 
 def apply_tags(transactions, fun):
-    """Adds the reult of tagging function fun(comment) as new tag field"""
+    """Adds the result of tagging function fun(comment) as new tag field"""
     return list(map(lambda t: dict(t, **dict(tags=fun(t['comment']))) , transactions))
 
 def apply_annotations(transactions, annotations, fun = lambda tags: tags):
@@ -156,10 +156,11 @@ def apply_annotations(transactions, annotations, fun = lambda tags: tags):
     index = {}
     for i, t in enumerate(transactions):
         key = transaction_hash(t)
-        if key in index:
-            logging.error(f'Hash collision for key {key}')
-            pass
-        index[key] = i
+        if key in index:            
+            index[key].append(i)
+            logging.error(f'{len(index[key])-1} hash collision(s) for key {key}')
+        else:
+            index[key] = [i]
     
     # apply annotations to transactions
     for annotation in annotations:            
@@ -167,7 +168,8 @@ def apply_annotations(transactions, annotations, fun = lambda tags: tags):
         if key not in index:                
             logging.error(f'Transaction not found "{key}"')
         else:
-            transactions[index[key]]['tags'] = fun(annotation['tags'])
+            for idx in index[key]:
+                transactions[idx]['tags'] = fun(annotation['tags'])
 
     return transactions
 
