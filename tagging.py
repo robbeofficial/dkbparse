@@ -3,11 +3,11 @@ import re
 import logging
 
 class RegTag:
-    regs = {}
-    parents = {}
-    children = {}
 
     def __init__(self, f):
+        self.regs = {}
+        self.parents = {}
+        self.children = {}
         self.traverse(yaml.safe_load(f))
     
     def traverse(self, tags, parents = []):
@@ -32,7 +32,7 @@ class RegTag:
         return tag in self.parents.keys()
 
     def childs(self, tag):
-        return self.children[tag] if tag in self.children else [tag]
+        return self.children[tag] if tag in self.children else []
 
     def tags(self, string):
         matched = []
