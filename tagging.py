@@ -5,6 +5,7 @@ import logging
 class RegTag:
     regs = {}
     parents = {}
+    children = {}
 
     def __init__(self, f):
         self.traverse(yaml.safe_load(f))
@@ -12,6 +13,11 @@ class RegTag:
     def traverse(self, tags, parents = []):
         for k,v in tags.items():
             self.parents[k] = parents
+            if len(parents) > 0:
+                direct_parent = parents[-1]
+                if direct_parent not in self.children:
+                    self.children[direct_parent] = []
+                self.children[direct_parent].append(k)                
             if type(v) is str:
                 if k in self.regs:
                     logging.error(f'Ambigious label {k}')
@@ -24,6 +30,9 @@ class RegTag:
 
     def exists(self, tag):
         return tag in self.parents.keys()
+
+    def childs(self, tag):
+        return self.children[tag] if tag in self.children else [tag]
 
     def tags(self, string):
         matched = []
