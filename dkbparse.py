@@ -372,10 +372,15 @@ if __name__ == '__main__':
         tags_expand = regtag.expand_parents
     
     # apply manual tagging if tags-manual.csv is present
-    tags_manual = getcwd() + '/tags-manual.csv' 
+    tags_manual = getcwd() + '/tags-manual.csv'
     if isfile(tags_manual):
         annotations = csv_to_transactions(open(tags_manual))
         transactions = apply_annotations(transactions, annotations, tags_expand)
+
+    # create tags-missing.csv with all untagged transactions
+    tags_missing = getcwd() + '/tags-missing.csv'
+    with open(tags_missing, 'w') as f:
+        transactions_to_csv(f, filter(lambda t: len(t['tags']) == 0,transactions))
     
     # write transactions as CSV to stdout
     transactions_to_csv(sys.stdout, transactions)
