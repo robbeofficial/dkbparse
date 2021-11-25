@@ -6,13 +6,11 @@ import logging
 import csv
 import os
 import sys
+
 from datetime import datetime
 from decimal import Decimal
-from os import getcwd
-from os.path import isfile
 
 # https://www.bonify.de/abkuerzungen-im-verwendungszweck
-# TODO statementa always have same structure (regardless if account or visa)
 
 # patterns that are re-used in regular expressions
 DATE = r"(\d\d)\.(\d\d)\.(\d\d\b|\d\d\d\d\b)"
@@ -24,6 +22,7 @@ TEXT = r"\S.*\S"
 SIGN = r"[\+\-SH]"
 CARD_NO = r"\b[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\s[0-9X]{4}\b"
 BLANK = r"\s{3,}"
+MONTHS = dict(Januar=1, Februar=2, März=3, April=4, Mai=5, Juni=6, Juli=7, August=8, September=9, Oktober=10, November=11, Dezember=12)
 
 re_visa_filename = re.compile(
     r"Kreditkartenabrechnung_\d\d\d\dxxxxxxxx\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf"
@@ -98,15 +97,14 @@ re_visa_account = re.compile(
 
 
 def transactions_to_csv(f, transactions):
-    """writes transactions as CSV to f"""
-    keys = ['account','statement','booked','valued','type','value','tags','comment']
-    transactions = sorted(transactions, key=lambda t: t["booked"], reverse=True)    
-    transactions = map(lambda t: dict(t, **dict(tags = ' '.join(t['tags']))), transactions)
+    """writes transactions as CSV to f"""    
+    keys = ['account','year','statement','transaction','booked','valued','value','type','payee','comment']
+    transactions = sorted(transactions, key=lambda t: t["valued"], reverse=True)
     dict_writer = csv.DictWriter(f, keys)
     dict_writer.writeheader()
     dict_writer.writerows(transactions)
 
-def csv_to_transactions(f):
+def csv_to_transactions(f): # TODO new format
     """Reads transactions as CSV from f"""    
     Date = lambda s: datetime.strptime(s, '%Y-%m-%d').date()
     decimal_accuracy = Decimal('0.01')
@@ -141,37 +139,6 @@ def scan_dirs(dirpaths):
                     transactions.extend(transactions_statement)
 
     return transactions, statements
-
-def apply_tags(transactions, fun):
-    """Adds the result of tagging function fun(comment) as new tag field"""
-    return list(map(lambda t: dict(t, **dict(tags=fun(t['comment']))) , transactions))
-
-def apply_annotations(transactions, annotations, fun = lambda tags: tags):
-    """Applies tags that are present in annotations also to transactions after passing them to fun"""
-    def transaction_hash(t):
-            keys = ['account','statement','booked','valued','type','value','comment']
-            return ''.join(map(lambda key: str(t[key]), keys)).replace(' ','')
-        
-    # build an index of transactions to avoid linear search for each annotation
-    index = {}
-    for i, t in enumerate(transactions):
-        key = transaction_hash(t)
-        if key in index:            
-            index[key].append(i)
-            logging.error(f'{len(index[key])-1} hash collision(s) for key {key}')
-        else:
-            index[key] = [i]
-    
-    # apply annotations to transactions
-    for annotation in annotations:            
-        key = transaction_hash(annotation)
-        if key not in index:                
-            logging.error(f'Transaction not found "{key}"')
-        else:
-            for idx in index[key]:
-                transactions[idx]['tags'] = fun(annotation['tags'])
-
-    return transactions
 
 def read_pdf_table(fname):
     """Reads contents of a PDF table into a string using pdftotext"""
@@ -210,7 +177,7 @@ def sign(s):
 def read_bank_statement(pdf):
     """returns transactions list and statement summary extracted from a DKB bank statement"""
 
-    statement = {}
+    statement = {"file": pdf}
     transactions = []
     res = {}
 
@@ -218,6 +185,7 @@ def read_bank_statement(pdf):
     lines = table.splitlines()
 
     match_table_header = None
+    transaction_number = 1
 
     for line in lines:
         if check_match(re_range, line, res):
@@ -249,23 +217,28 @@ def read_bank_statement(pdf):
                 value = -value
             transactions.append(
                 {
-                    "account": statement["account"],
-                    "statement": f"{statement['no']}/{statement['year']}",
+                    "account": f'{statement["account"]:0>16}',
+                    "year": statement['year'],
+                    "statement": f"{statement['no']:02}",
+                    "transaction": f"{transaction_number:03}",
                     "booked": date(match.group("booked") + str(statement["year"])),
                     "valued": date(match.group("valued") + str(statement["year"])),
                     "type": match.group("type").strip(),
                     "value": value,
-                    "tags": [],
+                    "payee": "",
                     "comment": "",
-                }
+                }                
             )
+            transaction_number += 1
         elif check_match(re_transaction_details, line, res) and match_table_header:
             match = res["match"]
             if match.start("line") == match_table_header.start("comment"):
-                if not transactions[-1]["comment"]:
-                    transactions[-1]["comment"] = match.group("line")
-                else:
-                    transactions[-1]["comment"] += " " + match.group("line")
+                if not transactions[-1]["payee"]:
+                    transactions[-1]["payee"] = match.group("line")
+                    transactions[-1]["comment"] = transactions[-1]["payee"]
+                    
+                else:                    
+                    transactions[-1]["comment"] += " " + match.group("line") # note: line might be missing spaces anywhere
         else:
             logging.debug(f"'{line}'\tNOT MATCHED")
 
@@ -285,7 +258,8 @@ def read_visa_statement_lines(lines):
     statement = {}
     transactions = []
     statement["balance_old"] = 0
-    res = {}
+    transaction_number = 1
+    res = {}    
 
     for line in lines:
         if check_match(re_visa_balance_old, line, res):
@@ -295,6 +269,7 @@ def read_visa_statement_lines(lines):
         elif check_match(re_visa_month_year, line, res):
             match = res["match"]
             statement["month"] = match.group("month")
+            statement["no"] = MONTHS[statement["month"]]
             statement["year"] = match.group("year")
         elif check_match(re_visa_range, line, res):
             match = res["match"]
@@ -319,16 +294,19 @@ def read_visa_statement_lines(lines):
                 valued = date(valued[:6] + "20" + valued[6:])
             transactions.append(
                 {
-                    "account": statement["account"],
-                    "statement": f"{statement['month']}/{statement['year']}",
+                    "account": ''.join(statement['account'].split()),
+                    "year": statement["year"],
+                    "statement": f"{statement['no']:02}",
+                    "transaction": f"{transaction_number:03}",
                     "booked": booked,
                     "valued": valued,
                     "type": "VISA",
                     "value": value,
-                    "tags": [],
+                    "payee": "",
                     "comment": match.group("comment"),
                 }
             )
+            transaction_number += 1
         elif check_match(re_visa_comment_extended, line, res):
             match = res["match"]
             transactions[-1]["comment"] += " " + match["comment_extended"]
@@ -348,6 +326,7 @@ def read_visa_statement(pdf):
     lines = table.splitlines()
 
     transactions, statement = read_visa_statement_lines(lines)
+    statement['file'] = pdf
 
     # check for parsing errors
     transactions_sum = sum(map(lambda t: t["value"], transactions))
@@ -360,27 +339,8 @@ def read_visa_statement(pdf):
     return transactions, statement
 
 if __name__ == '__main__':
+    # logging.basicConfig(level=logging.INFO)
+    
+    # parse PDF statements
     transactions, statements = scan_dirs(sys.argv[1:])
-    
-    # apply autotagging if tags-auto.yaml is present
-    tags_auto = getcwd() + '/tags-auto.yaml'
-    tags_expand = lambda tags: tags
-    if isfile(tags_auto):
-        from tagging import RegTag
-        regtag = RegTag(open(tags_auto, 'r'))
-        transactions = apply_tags(transactions, regtag.tags)
-        tags_expand = regtag.expand_parents
-    
-    # apply manual tagging if tags-manual.csv is present
-    tags_manual = getcwd() + '/tags-manual.csv'
-    if isfile(tags_manual):
-        annotations = csv_to_transactions(open(tags_manual))
-        transactions = apply_annotations(transactions, annotations, tags_expand)
-
-    # create tags-missing.csv with all untagged transactions
-    tags_missing = getcwd() + '/tags-missing.csv'
-    with open(tags_missing, 'w') as f:
-        transactions_to_csv(f, filter(lambda t: len(t['tags']) == 0,transactions))
-    
-    # write transactions as CSV to stdout
     transactions_to_csv(sys.stdout, transactions)
