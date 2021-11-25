@@ -104,11 +104,11 @@ def transactions_to_csv(f, transactions):
     dict_writer.writeheader()
     dict_writer.writerows(transactions)
 
-def csv_to_transactions(f): # TODO new format
+def csv_to_transactions(f):
     """Reads transactions as CSV from f"""    
     Date = lambda s: datetime.strptime(s, '%Y-%m-%d').date()
     decimal_accuracy = Decimal('0.01')
-    converters={'valued': Date, 'booked': Date, 'value': lambda s: Decimal(s).quantize(decimal_accuracy), 'tags': lambda t: t.split(' ')}
+    converters={'valued': Date, 'booked': Date, 'value': lambda s: Decimal(s).quantize(decimal_accuracy)}
     reader = csv.DictReader(f)
     transactions = []
     for row in reader:        
