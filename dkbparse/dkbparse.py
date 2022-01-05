@@ -338,9 +338,9 @@ def read_visa_statement(pdf):
 
     return transactions, statement
 
-if __name__ == '__main__':
-    # logging.basicConfig(level=logging.INFO)
-    
-    # parse PDF statements
+def main():
     transactions, statements = scan_dirs(sys.argv[1:])
     transactions_to_csv(sys.stdout, transactions)
+
+if __name__ == '__main__':
+    main()
