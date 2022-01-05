@@ -15,7 +15,7 @@ You will need to have Python 3 and pdftotext installed.
 ### Shell Script
 You can run `dkbparse.py` as shell script and pass a list of directories that contain DKB PDF statements. The script will write all parsed transactions as CSV to stdout:
 ```bash
-$ ./dkbparse.py ~/dkb/account/1234567890/ ~/dkb/visa/4998xxxxxxxx1234/ > transactions.csv
+$ ./dkbparse.py ~/dkb/account/1234567890/ ~/dkb/visa/4998xxxxxxxx1234/
 
 account,year,statement,transaction,booked,valued,value,type,payee,comment
 0000001234567890,2019,01,001,2019-01-02,2018-12-31,-250.00,Überweisung,Tante Helga,ÜBERWEISUNG DATUM 29.12.2018, 05.33 UHR 1.TAN 123456
