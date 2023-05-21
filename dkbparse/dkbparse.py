@@ -25,10 +25,10 @@ BLANK = r"\s{3,}"
 MONTHS = dict(Januar=1, Februar=2, März=3, April=4, Mai=5, Juni=6, Juli=7, August=8, September=9, Oktober=10, November=11, Dezember=12)
 
 re_visa_filename = re.compile(
-    r"Kreditkartenabrechnung_\d\d\d\dxxxxxxxx\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf"
+    r"Kreditkartenabrechnung_\d\d\d\d[_x]{8}\d\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf"
 )
 re_filename = re.compile(
-    r"Kontoauszug_\d{10}_Nr_\d\d\d\d_\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf"
+    r"Kontoauszug_\d{8,10}_Nr_\d\d\d\d_\d\d\d_per_\d\d\d\d_\d\d_\d\d.pdf"
 )
 
 re_range = re.compile(
